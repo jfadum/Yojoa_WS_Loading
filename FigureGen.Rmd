@@ -1,0 +1,283 @@
+---
+title: "Figure Generation"
+author: "J Fadum"
+date: "2023-04-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r include=FALSE}
+
+#PACKAGES
+library(tidyverse)
+library(signal)
+library(xts)
+library(dygraphs) 
+library(RcppRoll)
+library(imputeTS)
+library(ggthemes)
+library(broom)
+library(tsibble)
+library(GGally)
+library(tidyr)
+library(lubridate)
+library(readr)
+library(plotly) 
+library(ggthemes)
+
+#Figure colors...
+
+#Raices #8C510A
+#Helado #BF812D
+#Varsovia  #01665E
+#Yure    #542788 
+#Balas  #35978F
+#Cacao #8073AC
+```
+
+## Figure 2
+Note: First call the q_preds dataframe created in DischargeCalcs.Rmd.
+We will also load the discharge data for the two tributaries which used Manning's equation (where sensor installation was not possible)
+
+```{r warning=FALSE, error=FALSE, message=FALSE}
+cacao_q<- read_csv("q_cacao_2019.csv")
+cacao_q$date<- mdy(cacao_q$date)
+
+yure_q<- read_csv("q_yure_2019.csv")
+yure_q$date<- mdy(yure_q$date)
+
+q_daily <- q_preds %>%
+  inner_join(raw_cm %>% 
+               select(site,datetime,temp)) %>%
+  group_by(site,date) %>%
+  summarize(q = median(med_q),
+            count = n(),
+            temp = median(temp)) %>%
+  dplyr::filter(count > 4*20)
+
+q_daily<- q_daily %>% 
+  select(date, q, site)
+
+cacao_q<- cacao_q %>% 
+  mutate(site= "cacao") #add site so can combine data sets
+
+yure_q<- yure_q %>% 
+  mutate(site= "yure") #add site so can combine data sets
+
+q_daily<- rbind(cacao_q, yure_q, q_daily)  
+
+low_flow<- q_daily %>%     #low flow subset for figure 2
+  dplyr::filter(site == "balas"|
+                site == "cacao"|
+                site == "raices") %>% 
+  mutate(cat= "low flow")
+
+high_flow<- q_daily %>%    #higher flow subset for figure 2
+  dplyr::filter(site == "helado"|
+                site == "varsovia"|
+                site == "yure") %>% 
+  mutate(cat= "high flow")
+
+low_trib_discharge<- ggplot(low_flow, aes(x = date, y = q, color=site)) + 
+  theme_few()+
+  geom_line(aes(linetype= site)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  ggtitle("Tributary Discharge")+
+  ylab("Q (cubic m/sec)")+
+  scale_x_date(limits = as.Date(c("2019-04-01", "2020-04-01")))+
+   scale_color_manual(values=c("#35978F", "#8073AC", "#8C510A"))
+
+low_trib_discharge
+
+  
+high_trib_discharge<- ggplot(high_flow, aes(x = date, y = q, color=site)) + 
+  theme_few()+
+  geom_line(aes(linetype= site)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  ggtitle("Tributary Discharge")+
+  ylab("Q (cubic m/sec)")+
+  scale_x_date(limits = as.Date(c("2019-04-01", "2020-04-01")))+
+   scale_color_manual(values=c("#BF812D", "#01665E", "#542788"))
+
+high_trib_discharge
+
+#LUBRIDATE ISNT WORKING HERE 
+rain <- read_csv("precip.csv")
+rain$date <- mdy(rain$date) #correct date format with lubridate
+str(rain)
+precip<- rain%>%  
+  mutate(month=month(date)) %>% 
+  drop_na() %>% 
+  group_by(month)%>%
+  summarise(total=sum(rain))
+
+precip$month<- as.character(precip$month)
+month_ordered<- ordered(precip$month, levels = c("4", "5", "6", "7", "8", "9", "10", "11", "12", "1", "2", "3")) #order boxplots
+
+precip_plot<- ggplot(precip, aes(y=total, x=month_ordered)) +
+  geom_bar(position="stack", stat="identity")+
+    ggtitle("Weekly cumulative rain in 2019 (mm)") +
+  theme_few()+
+  ylab("Precipitation (mm)")+
+  xlab("Week")
+  
+precip_plot
+  
+```
+
+Now for the rest of the figures we need the nutrient data.
+
+## Figure 3
+```{r warning=FALSE, error=FALSE,  message=FALSE}
+nutes <- read_csv('13OCT21_Rivers_JFedits.csv') %>% 
+  mutate(datetime = mdy_hms(paste(date,'12:00:00')),
+         date = as.Date(datetime),
+         tp = as.numeric(tp))
+
+#change units 
+nutes<- nutes %>%
+  filter(site!="Canal") %>% 
+  mutate(doc_uM= (doc*1000000)/(1000*12.011),
+         tp_uM= (tp*1000000)/(1000*30.973762),
+         nh4_uM= (nh4_n*1000000)/(1000*14.0067),
+         no3_uM= (no3_n*1000000)/(1000*14.0067))
+
+tp_plot<- ggplot(nutes,aes(x=date,y=tp_uM, color=site)) +
+  geom_point()+
+  geom_line(alpha= 0.5) +
+  ggtitle("TP")+
+  ylab("")+
+  facet_wrap(~site , ncol= 3) +
+  theme_few()+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position = "none")+
+  scale_color_manual(values=c("#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "#542788"))+
+  scale_shape_manual(values= c(19,1))
+
+tp_plot
+
+doc_plot<- ggplot(nutes,aes(x=date,y=doc_uM, color=site)) +
+  geom_point()+
+  geom_line(alpha= 0.5) +
+  ggtitle("DOC")+
+  ylab("")+
+  facet_wrap(~site , ncol= 3) +
+  theme_few()+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position = "none")+
+  scale_color_manual(values=c("#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "#542788"))
+
+doc_plot
+
+nh4_plot<- ggplot(nutes,aes(x=date,y=nh4_uM, color=site)) +
+  geom_point()+
+  geom_line(alpha= 0.5) +
+  ggtitle("NH4")+
+  ylab("")+
+  facet_wrap(~site , ncol= 3) +
+  theme_few()+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position = "none")+
+  scale_color_manual(values=c("#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "#542788"))
+
+nh4_plot
+
+no3_plot<- ggplot(nutes,aes(x=date,y=no3_uM, color=site)) +
+  geom_point()+
+  geom_line(alpha= 0.5) +
+  ggtitle("NO3")+
+  ylab("")+
+  facet_wrap(~site , ncol= 3) +
+  theme_few()+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position = "none")+
+  scale_color_manual(values=c("#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "#542788"))
+
+no3_plot
+```
+
+## Figure 4
+
+First we  need to calculate mean nutrient concentrations because duplicates will create problems when we merge our nutrient and discharge data. 
+
+Note: We are not yet interpolating nutrient concentrations. Right now we just want to know the relationship between observations. 
+
+
+```{r warning=FALSE, error=FALSE, message=FALSE}
+#First get daily q and then combine with Cacao and Yure data
+q_daily <- q_preds %>%
+  inner_join(raw_cm %>% 
+               select(site,datetime,temp)) %>%
+  group_by(site,date) %>%
+  summarize(q = median(med_q),
+            count = n(),
+            temp = median(temp)) %>%
+  dplyr::filter(count > 4*20)
+
+q_daily<- q_daily %>% 
+  select(date, q, site)
+
+cacao_q<- cacao_q %>% 
+  mutate(site= "cacao") #add site so can combine data sets
+
+yure_q<- yure_q %>% 
+  mutate(site= "yure") #add site so can combine data sets
+
+q_daily<- rbind(cacao_q, yure_q, q_daily) %>% 
+  drop_na()
+
+#Now get means of the concentrations (do we have a 1 to 1 match on Qs and nutrient concentrations)
+
+nh4<- nutes %>% 
+  select(date, site, nh4_uM) %>% 
+  group_by(date, site) %>% 
+  mutate(nh4_uM= mean(nh4_uM)) %>% 
+  unique()
+
+no3<- nutes %>% 
+  select(date, site, no3_uM) %>% 
+  group_by(date, site) %>% 
+  mutate(no3_uM= mean(no3_uM)) %>% 
+  unique()  
+  
+tp<- nutes %>% 
+  select(date, site, tp_uM) %>% 
+  group_by(date, site) %>% 
+  mutate(tp_uM= mean(tp_uM)) %>% 
+  unique() 
+
+doc<- nutes %>% 
+  select(date, site, doc_uM) %>% 
+  group_by(date, site) %>% 
+  mutate(doc_uM= mean(doc_uM)) %>% 
+  unique() 
+         
+nutes1<-cbind(nh4, no3[,3], tp[,3], doc[,3]) #Single obs data set 
+
+#Now combine nutrients and discharge 
+
+complete<- full_join(q_daily, nutes1, by= c("site", "date")) %>% 
+  drop_na
+
+complete_long <- complete %>%
+  pivot_longer(cols = nh4_uM:doc_uM) %>% 
+  mutate(month= month(date)) 
+
+q_v_nutes<-ggplot(complete_long,aes(x=q,y=value, color= site, alpha= month)) + 
+  geom_point() + 
+  ggthemes::theme_few() + 
+  xlab("Q")+
+  ylab ("")+
+  facet_grid(name~site, scales = 'free')  +
+  theme_few()+
+  theme(legend.position = "right")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+scale_color_manual(values=c("#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "#542788"))
+
+q_v_nutes
+```
+
