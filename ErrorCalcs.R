@@ -1,17 +1,6 @@
----
-title: "Watershed Loading Calcs"
-author: "M. Ross and J Fadum"
-date: "2023-04-04"
-output: html_document
----
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+#Required packages
 
-```{r include=FALSE}
-
-#PACKAGES
 library(tidyverse)
 library(signal)
 library(xts)
@@ -27,28 +16,12 @@ library(lubridate)
 library(readr)
 library(plotly) 
 library(ggthemes)
-library(dplyr)
 
 
-set.seed(37)
-#Figure colors...
 
-#Raices #8C510A
-#Helado #BF812D
-#Varsovia  #01665E
-#Yure    #542788 
-#Balas  #35978F
-#Cacao #8073AC
-```
+#Can't calculate error for Cacao and Yure, 
+#but here we calculate the potential MAX contributions of the other four tributaries
 
-Now we will be interpolating nutrient concentrations to get daily loading where possible (i.e. the tributaries with pressure transducers)
-
-A note about joining the data sets... Since the rivers behave in a largely chemostatic manner, we can't build models to go from Q to 15 min predictions of concentration (at least not reliably). Therefore, we are using Liken's method (we will assume the concentration linearly drifts between samples and then just sum the concentrations using that assumption)
-
-You will need the q_preds dataframe created in DischargeCalcs.Rmd
-
-
-```{r warning=FALSE, error=FALSE, message=FALSE}
 nutes <- read_csv('13OCT21_Rivers_JFedits.csv') %>% 
   mutate(datetime = mdy_hms(paste(date,'12:00:00')),
          date = as.Date(datetime),
@@ -65,7 +38,7 @@ no3<- nutes %>%
   group_by(date, site) %>% 
   mutate(no3_n= mean(no3_n)) %>% 
   unique()  
-  
+
 tp<- nutes %>% 
   select(date, site, tp, datetime) %>% 
   group_by(date, site) %>% 
@@ -77,13 +50,13 @@ doc<- nutes %>%
   group_by(date, site) %>% 
   mutate(doc= mean(doc)) %>% 
   unique() 
-         
+
 tdn<- nutes %>% 
   select(date, site, tdn, datetime) %>% 
   group_by(date, site) %>% 
   mutate(tdn= mean(tdn)) %>% 
   unique() 
-        
+
 nutes<-cbind(nh4, no3[,3], tp[,3], doc[,3], tdn[,3])
 #now that we only have one observation per day we can join ...
 
@@ -104,7 +77,7 @@ q_preds <- jumped_staff %>%
 sensor_qs <- q_preds %>%
   as_tibble() %>%
   group_by(date,site) %>%
-  summarize(q = mean(med_q,na.rm=T))
+  summarize(q = mean(max_q,na.rm=T))
 
 sensor_qs<- as.data.frame(sensor_qs)
 cacao_q<- read_csv("q_cacao_2019.csv")
@@ -118,7 +91,7 @@ yure_q<- read_csv("q_yure_2019.csv")
 yure_q$date<- mdy(yure_q$date)
 yure_q<- yure_q %>% 
   mutate(site= "yure") %>% #add site so can combine data sets
-drop_na()
+  drop_na()
 
 
 daily_q<- rbind(sensor_qs, cacao_q, yure_q)
@@ -128,7 +101,7 @@ complete <- daily_q %>%
   group_by(site) %>%
   mutate(interpolated = ifelse(is.na(doc),'Yes','No')) %>%
   mutate(across(c('nh4_n','no3_n','tp','doc','tdn'),
-          ~na_interpolation(.))) %>%
+                ~na_interpolation(.))) %>%
   arrange(site,date) %>%
   dplyr::filter(date < ymd('2020-04-01'),
                 date > ymd('2019-04-01')) %>% 
@@ -148,134 +121,22 @@ fluxes <- complete_long%>%
   mutate(kg_day = q_lpd*kgl) %>% 
   drop_na()
 
-
-```
-
-
-## Figure 5a
-
-```{r warning=FALSE, error=FALSE, message=FALSE}
-tdn_daily<- fluxes %>% 
-  filter(name=="tdn")
-
-daily_tdn<- ggplot(tdn_daily, aes(x = date, y = kg_day, color=site, shape= interpolated)) + 
-  geom_point(size= 5)+
-#  geom_line(alpha= 0.5)+
-  ggtitle("Tributary Discharge")+
-  ylab("TDN (kg/day)")+
-  scale_color_manual(values=c("#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "#542788"))+
-  scale_shape_manual(values= c(19,1))+
-  theme_few()+
-  facet_wrap(~site , ncol= 3)+
-    scale_x_date(limits = as.Date(c("2019-04-01", "2020-04-01")))+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-  theme(legend.position = "none")
-
-daily_tdn
-
-tp_daily<- fluxes %>% 
-  filter(name=="tp")
-
-daily_tp<- ggplot(tp_daily, aes(x = date, y = kg_day, color=site, shape= interpolated)) + 
-  geom_point(size= 5)+
-#  geom_line(alpha= 0.5)+
-  ggtitle("Tributary Discharge")+
-  ylab("TP (kg/day)")+
-  scale_color_manual(values=c("#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "#542788"))+
-  scale_shape_manual(values= c(19,1))+
-  theme_few()+
-  facet_wrap(~site , ncol= 3)+
-    scale_x_date(limits = as.Date(c("2019-04-01", "2020-04-01")))+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-  theme(legend.position = "none")
-
-daily_tp
-
-ggsave("daily_tdn.png", plot = daily_tdn, width = 20, height = 8, units = "in", dpi= 600)
-ggsave("daily_tp.png", plot = daily_tp, width = 20, height = 8, units = "in", dpi= 600)
-
-count<- tp_daily %>% 
-  mutate(obs= 1) %>% 
-  group_by(site) %>% 
-  summarise(count= sum(obs))
-```
-
-
-## Figure 5b
-
-```{r warning=FALSE, error=FALSE, message=FALSE}
-
-data<- fluxes %>%   #create new dataframe to easily trim dates and sum by month
-#  subset(date> "2019-04-01" & date < "2020-04-01") %>% 
+max_flux<- fluxes %>%   #create new dataframe to easily trim dates and sum by month
+  #  subset(date> "2019-04-01" & date < "2020-04-01") %>% 
   mutate(month=month(date))  %>% 
   select(site, name, kg_day, month) %>% 
   group_by(site,name, month) %>% 
-  summarise(value=sum(kg_day)) 
+  summarise(value=sum(kg_day))  
 
-#write.csv(data, "med_calc_fluxes.csv", row.names=FALSE)
-
-data$month<- as.character(data$month)
-data$month <- factor(data$month, levels = c("1", "2", "3","4", "5", "6", "7", "8", "9", "10", "11", "12"))
+med_flux<-read_csv('med_calc_fluxes.csv') %>% 
+  rename(med_load= value)
 
 
-tdn <- data %>% 
-  dplyr::filter(name =="tdn") %>% 
-  group_by(site, month) %>% 
-  summarise(value=sum(value)) 
+error_calc<- full_join(max_flux, med_flux, by= c("site", "name", "month")) %>% 
+  mutate(percent_dif= ((value-med_load)/med_load)*100,
+         absolute_dif= value-med_load)
 
 
-tdn_stack<-ggplot(tdn, aes(fill=site, y=value, x=month)) +
-  geom_bar(position="stack", stat="identity")+
-   ggtitle("") +
-  theme_few()+
-  ylab("TDN (kg)")+
-  xlab("")+
-    theme(legend.position = "none")+
-  scale_fill_manual(values=c("#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "#542788"))
-  
-
-tdn_stack
-
-tp <- data %>% 
-  dplyr::filter(name =="tp") %>% 
-  group_by(site, month) %>% 
-  summarise(value=sum(value)) 
-
-tp_stack<- ggplot(tp, aes(fill=site, y=value, x=month)) +
-  geom_bar(position="stack", stat="identity")+
-  ylab("TP (kg)")+
-  xlab("")+
-  theme_few()+
-  theme(legend.position = "none")+
-  scale_fill_manual(values=c("#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "#542788"))
-tp_stack
-
-
-#ggsave("tp_stack.png", plot = tp_stack, width = 15, height = 8, units = "in", dpi= 600)
-#ggsave("tdn_stack.png", plot = tdn_stack, width = 15, height = 8, units = "in", dpi= 600)
-
-```
-
-## Determine "Normalization" for missing days
-
-```{r warning=FALSE, error=FALSE, message=FALSE}
-tdn_daily %>% 
-  mutate(count= 1) %>% 
-  group_by(site) %>% 
-  summarise(count=sum(count)) %>% 
-  mutate(norm= count/365)
-
-tp_daily %>% 
-  mutate(count= 1) %>% 
-  group_by(site) %>% 
-  summarise(count=sum(count))%>% 
-  mutate(norm= count/365)
-```
-
-
-## Figure 3c
-
-```{r warning=FALSE, error=FALSE, message=FALSE}
 N_P_aqua <- read_csv("N_P_aqua.csv")
 
 N_aqua <- N_P_aqua %>% 
@@ -287,7 +148,7 @@ N_aqua <- N_P_aqua %>%
   mutate(value=sum(value)) %>% 
   unique()
 
-tdn <- data %>% 
+tdn <- max_flux %>% 
   dplyr::filter(name =="tdn") %>% 
   group_by(site) %>% 
   summarise(value=sum(value)) %>% 
@@ -301,7 +162,7 @@ underestimate<- tdn %>%
   unique() %>% 
   mutate(site= "X estimate") %>% 
   select(site, value)
-  
+
 
 tdn<- tdn %>% 
   select(site, value)
@@ -318,9 +179,9 @@ N_loading<- N_loading%>%
 N_pie<-ggplot(N_loading, aes(x="", y=value, fill=site)) +
   geom_bar(stat="identity", width=1, color="white") +
   coord_polar("y", start=0) +
+  labs(title = "Annual N loading")+
   scale_fill_manual(values=c("red4","#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "antiquewhite","#542788"))+
-  theme_void()+
-    theme(legend.position = "none")
+  theme_void()
 
 N_pie
 
@@ -330,11 +191,11 @@ P_aqua <- N_P_aqua %>%
          value= P_kg) %>% 
   mutate(site= "Aquaculture") %>% 
   select(site, value ) %>% 
-    group_by(site) %>% 
+  group_by(site) %>% 
   mutate(value=sum(value))%>% 
   unique()
 
-tp <- data %>% 
+tp <- max_flux %>% 
   dplyr::filter(name =="tp") %>% 
   group_by(site) %>% 
   summarise(value=sum(value)) %>% 
@@ -348,7 +209,7 @@ underestimate<- tp %>%
   unique() %>% 
   mutate(site= "X estimate") %>% 
   select(site, value)
-  
+
 
 tp<- tp %>% 
   select(site, value)
@@ -365,27 +226,13 @@ P_loading<- P_loading%>%
 P_pie<-ggplot(P_loading, aes(x="", y=value, fill=site)) +
   geom_bar(stat="identity", width=1, color="white") +
   coord_polar("y", start=0) +
+  labs(title = "Annual P loading")+
   scale_fill_manual(values=c("red4","#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "antiquewhite","#542788"))+
-  theme_void()+
-    theme(legend.position = "none")
+  theme_void()
 
 P_pie
 
-ggsave("N_pie.png", plot = N_pie, width = 15, height = 15, units = "in", dpi= 600)
-ggsave("P_pie.png", plot = P_pie, width = 15, height = 15, units = "in", dpi= 600)
-```
-## Aditional analysis: Loading per km2
 
-```{r}
-library(readxl)
-area<- read_excel("drainage_areas.xlsx")
-
-calc_P<- left_join(area, P_loading, by= "site") %>% 
-  mutate(P_per_area= value/area_km)
-
-calc_N<- left_join(area, N_loading, by= "site") %>% 
-  mutate(P_per_area= value/area_km)
-```
-
-
+#Calculating WS contributions using max modeled discharge only decreases aquaculture P contributions by ~1% and 
+#N contributions by < 2%
 

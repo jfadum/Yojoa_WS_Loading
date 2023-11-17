@@ -70,6 +70,100 @@ yure_q<- yure_q %>%
 
 q_daily<- rbind(cacao_q, yure_q, q_daily)  
 
+
+  
+```
+
+
+
+##In text results section calculations 
+```{r include =FALSE}
+str(q_daily)
+
+raices<- q_daily %>% 
+  filter(site== "raices") %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(q),
+            max= max(q),
+            mean= mean(q),
+            sd= sd(q),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+helado<- q_daily %>% 
+  filter(site== "helado") %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(q),
+            max= max(q),
+            mean= mean(q),
+            sd= sd(q),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+balas<- q_daily %>% 
+  filter(site== "balas") %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(q),
+            max= max(q),
+            mean= mean(q),
+            sd= sd(q),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+yure<- q_daily %>% 
+  filter(site== "yure") %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(q),
+            max= max(q),
+            mean= mean(q),
+            sd= sd(q),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+varsovia<- q_daily %>% 
+  filter(site== "varsovia") %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(q),
+            max= max(q),
+            mean= mean(q),
+            sd= sd(q),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+cacao<- q_daily %>% 
+  filter(site== "cacao") %>% 
+  drop_na() %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(q),
+            max= max(q),
+            mean= mean(q),
+            sd= sd(q),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+
+
+#correlation
+
+library(psych)
+
+q_corr<- q_daily %>% 
+  pivot_wider(names_from = site, values_from = q) %>% 
+  drop_na()
+
+q_corr$raices<-as.numeric(q_corr$raices)
+q_corr$cacao<-as.numeric(q_corr$cacao)
+q_corr$varsovia<-as.numeric(q_corr$varsovia)
+q_corr$yure<-as.numeric(q_corr$yure)
+q_corr$helado<-as.numeric(q_corr$helado)
+q_corr$balas<-as.numeric(q_corr$balas)
+
+corr.test(q_corr[,2:7])
+
+```
+
+
+```{r warning=FALSE, error=FALSE, message=FALSE}
 low_flow<- q_daily %>%     #low flow subset for figure 2
   dplyr::filter(site == "balas"|
                 site == "cacao"|
@@ -105,7 +199,7 @@ high_trib_discharge<- ggplot(high_flow, aes(x = date, y = q, color=site)) +
 
 high_trib_discharge
 
-#LUBRIDATE ISNT WORKING HERE 
+
 rain <- read_csv("precip.csv")
 rain$date <- mdy(rain$date) #correct date format with lubridate
 str(rain)
@@ -126,7 +220,6 @@ precip_plot<- ggplot(precip, aes(y=total, x=month_ordered)) +
   xlab("Week")
   
 precip_plot
-  
 ```
 
 Now for the rest of the figures we need the nutrient data.
@@ -198,6 +291,84 @@ no3_plot<- ggplot(nutes,aes(x=date,y=no3_uM, color=site)) +
   scale_color_manual(values=c("#35978F", "#8073AC", "#BF812D", "#8C510A","#01665E", "#542788"))
 
 no3_plot
+```
+
+
+##In text 
+
+```{r}
+raices<- nutes %>% 
+  filter(site== "raices") %>% 
+  group_by(site) %>% 
+  drop_na() %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(tp_uM),
+            max= max(tp_uM),
+            mean= mean(tp_uM),
+            sd= sd(tp_uM),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+helado<- nutes %>% 
+  filter(site== "helado") %>% 
+  group_by(site) %>% 
+  drop_na() %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(tp_uM),
+            max= max(tp_uM),
+            mean= mean(tp_uM),
+            sd= sd(tp_uM),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+balas<- nutes %>% 
+  filter(site== "balas") %>% 
+  group_by(site) %>% 
+  drop_na() %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(tp_uM),
+            max= max(tp_uM),
+            mean= mean(tp_uM),
+            sd= sd(tp_uM),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+yure<- nutes %>% 
+  filter(site== "yure") %>% 
+  group_by(site) %>% 
+  drop_na() %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(tp_uM),
+            max= max(tp_uM),
+            mean= mean(tp_uM),
+            sd= sd(tp_uM),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+varsovia<- nutes %>% 
+  filter(site== "varsovia") %>% 
+  group_by(site) %>% 
+  drop_na() %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(tp_uM),
+            max= max(tp_uM),
+            mean= mean(tp_uM),
+            sd= sd(tp_uM),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n)) 
+
+cacao<- nutes %>% 
+  filter(site== "cacao") %>% 
+  group_by(site) %>% 
+  drop_na() %>% 
+  mutate(obs =1) %>% 
+  summarise(min= min(tp_uM),
+            max= max(tp_uM),
+            mean= mean(tp_uM),
+            sd= sd(tp_uM),
+            n= sum(obs)) %>% 
+  mutate(se= sd/ sqrt(n))  
+
 ```
 
 ## Figure 4
