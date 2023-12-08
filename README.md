@@ -1,2 +1,3 @@
 # Yojoa_WS_Loading
-Discharge calculations and watershed loading estimates as published in Fadum et al. 2023 
+Discharge calculations and watershed loading estimates for 'Nutrient loading from a sustainably certified aquaculture operation dwarfs annual nutrient inputs from a large multi-use watershed in Lake Yojoa, Honduras, C.A.' 
+Code authorship: M Ross, J Fadum ..... 
