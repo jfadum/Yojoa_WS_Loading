@@ -1,12 +1,13 @@
 # Yojoa_WS_Loading
+
 Discharge calculations and watershed loading estimates for 'Nutrient loading from a sustainably certified aquaculture operation dwarfs annual nutrient inputs from a large multi-use watershed in Lake Yojoa, Honduras, C.A.' 
 Preprint: INSERT BIORXVs LINK
 
 Code authorship: M Ross, J Fadum 
 
-Code files:
--LoadingCalcs: Discharge and nutrient loading calculations and related figures for Fadum et al. 2024
--FigureGen: Code for Figures 2-4 in text, and Supplemental text 3
+Code files: 
+- LoadingCalcs: Discharge and nutrient loading calculations and related figures for Fadum et al. 2024
+- FigureGen: Code for Figures 2-4 in text, and Supplemental text 3
 
 Data files: 
 - rating_curves_2018_2019: Rating cruves for tributaries Helado, Balas, Varsovia, and Raices
